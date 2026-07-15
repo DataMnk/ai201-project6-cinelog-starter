@@ -1,7 +1,7 @@
 # PR Response Doc — CineLog Watchlist Feature
 
 ## AI Usage
-<!-- Fill in at the end — how you used AI tools during this project -->
+I used Claude throughout this project for codebase orientation (understanding models.py, collection_service.py, and test patterns before touching the review comments), for help debugging environment/git issues (venv location, .gitignore conflicts, rebase conflicts), and as a sounding board while I worked out my own reasoning for Comments 4 and 5. The written arguments in Comments 4 and 5 are my own reasoning, refined through that back-and-forth, not AI-generated text.
 
 ## Comment 1 — Rename
 **What I did:**
@@ -97,9 +97,43 @@ reasonable default for a watchlist that's meant to be acted on soon, not
 browsed like a catalog. I implemented date-added order as requested.
 
 ## Comment 6 — Rebase
+
 **What conflicted:**
+My .gitignore conflicted with the one added in the main branch refactor (both branches added a new .gitignore independently). Also, models.py no longer had the WatchlistEntry class after rebasing, since main's refactor branch predates when I added that class, and film_id fields across the app needed to change from Integer to UUID (String).
+
 **How I resolved it:**
+I merged both .gitignore versions into one clean file. I re-added the WatchlistEntry class to models.py with film_id as db.String(36) instead of db.Integer, matching the same UUID pattern used in Film.id and CollectionEntry.film_id. I also updated fake_film_id in test_watchlist.py from an integer to a fake UUID string, to match the new type.
+
 **How I verified no conflict remains:**
+I ran pytest tests/ -v after each fix. All 7 tests passed (4 collection + 3 watchlist), confirming the rebase didn't break anything and the UUID migration was handled correctly in the watchlist code.
+
+## Commit History
+
+```
+b9ba76b (HEAD -> feature/watchlist) fix: update WatchlistEntry film_id to UUID after main branch refactor
+00e5be9 docs: add PR response doc with comments 1-5
+4d38e1d test: add test for nonexistent film_id in add_to_watchlist
+04d68a8 fix: rename save_to_watchlist to add_to_watchlist and add dedup check
+```
 
 ## PR Description
-<!-- Written at the end — feature overview, design decisions, manual testing steps -->
+
+This PR adds a watchlist feature to CineLog, so users can save films they want to 
+watch later, separate from their collection of films already watched. It includes 
+a new WatchlistEntry model, service functions (add_to_watchlist, get_watchlist), 
+and REST endpoints (GET /watchlist/<user_id>, POST /watchlist/<user_id>/add).
+
+**Design decisions:**
+1. Default visibility: watchlists default to public=False (private), so a user's 
+   list isn't visible to others unless they choose to share it (see Comment 4).
+2. Sort order: watchlists are sorted by date added, most recent first, matching 
+   the pattern already used for collections (see Comment 5).
+
+**How to test manually:**
+1. Run `python app.py` to start the server
+2. Create a user and a film in the database (or use existing test fixtures)
+3. POST to /watchlist/<user_id>/add with a JSON body like {"film_id": "<uuid>"} 
+   to add a film to the watchlist
+4. GET /watchlist/<user_id> to confirm the film appears, sorted by most recently added
+5. Try adding the same film twice, it should return an error instead of a duplicate entry
+6. Run `pytest tests/ -v` to confirm all 7 tests pass
